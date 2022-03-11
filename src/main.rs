@@ -1,4 +1,51 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
+
+#[derive(Serialize, Deserialize, Debug)]
+struct CMCResponse {
+    data: HashMap<String, Currency>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Currency {
+    name: String,
+    symbol: String,
+    quote: Quotes,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Quotes(HashMap<String, Quote>);
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Quote {
+    price: f64,
+    percent_change_7d: f64,
+}
+
+impl fmt::Display for Currency {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Name: {}, Symbol: {} Price: {} Change(7d): {}%",
+            self.name,
+            self.symbol,
+            self.quote.0.get("USD").unwrap().price.to_string(),
+            self.quote
+                .0
+                .get("USD")
+                .unwrap()
+                .percent_change_7d
+                .to_string()
+        )
+    }
+}
+
+impl CMCResponse {
+    fn get_currency(&self, currency: &str) -> Option<&Currency> {
+        self.data.get(currency)
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -16,8 +63,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .send()
         .await?;
 
-    let resp = resp.text().await?;
+    let prices = resp.json::<CMCResponse>().await?;
 
-    println!("{:#?}", resp);
+    if let Some(bitcoin) = prices.get_currency("BTC") {
+        println!("{}", bitcoin);
+    } else {
+        println!("Bitcoin is not in the list");
+    }
+
     Ok(())
 }
