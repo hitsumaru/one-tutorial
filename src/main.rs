@@ -1,3 +1,4 @@
+use clap::{App, Arg};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -48,12 +49,32 @@ impl CMCResponse {
 }
 
 #[tokio::main]
+#[warn(deprecated)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv::dotenv().ok();
+
+    let matches = App::new("OnteTutorial")
+        .version("1.0")
+        .author("Vinicius Miranda")
+        .about("Learn Rust in one go")
+        .arg(
+            Arg::with_name("currency_list")
+                .long("currencies")
+                .help("Pass the list of currencies you want to query")
+                .min_values(1)
+                .required(true),
+        )
+        .get_matches();
+
+    let currencies = matches
+        .value_of("currency_list")
+        .expect("No currencies were being passed");
+
     let cmc_pro_api_key = dotenv::var("CMC_PRO_API_KEY").expect("CMC key not set");
 
     let mut params = HashMap::new();
-    params.insert("symbol", "BTC");
+    params.insert("symbol", currencies.to_string());
+
     let client = reqwest::Client::new();
 
     let resp = client
