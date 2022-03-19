@@ -1,4 +1,5 @@
 use clap::{App, Arg};
+use csv::Writer;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -84,13 +85,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .send()
         .await?;
 
-    let prices = resp.json::<CMCResponse>().await?;
+    let currencies = resp.json::<CMCResponse>().await?;
 
-    if let Some(bitcoin) = prices.get_currency("BTC") {
-        println!("{}", bitcoin);
-    } else {
-        println!("Bitcoin is not in the list");
+    let mut wtr = Writer::from_path("prices.csv")?;
+    wtr.write_record(&["Name", "Symbol", "Price", "7DayChange"])?;
+    for (symbol, currency) in currencies.data.into_iter() {
+        wtr.write_record(&[
+            currency.name,
+            symbol.to_owned(),
+            currency.quote.0.get("USD").unwrap().price.to_string(),
+            currency
+                .quote
+                .0
+                .get("USD")
+                .unwrap()
+                .percent_change_7d
+                .to_string(),
+        ])?;
     }
+
+    wtr.flush()?;
 
     Ok(())
 }
