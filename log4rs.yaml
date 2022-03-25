@@ -13,7 +13,7 @@ appenders:
       kind: json 
 
 root: 
-  level: info 
+  level: debug 
   appenders: 
     - stdout 
     - file 

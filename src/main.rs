@@ -7,6 +7,12 @@ use std::collections::HashMap;
 use std::fmt;
 
 #[derive(Serialize, Deserialize, Debug)]
+struct EODResponse {
+    code: String,
+    close: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 struct CMCResponse {
     data: HashMap<String, Currency>,
 }
@@ -100,10 +106,15 @@ async fn main() -> Result<(), OneError> {
         .version("1.0")
         .author("Vinicius Miranda")
         .about("Learn Rust in one go")
-        .arg(
+        .args(
             Arg::with_name("currency_list")
                 .long("currencies")
                 .help("Pass the list of currencies you want to query")
+                .min_values(1)
+                .required(true),
+            Arg::with_name("etfs")
+                .long("etfs")
+                .help("Pass the ETF symbols to fetch prices for")
                 .min_values(1)
                 .required(true),
         )
@@ -113,9 +124,12 @@ async fn main() -> Result<(), OneError> {
         .value_of("currency_list")
         .expect("No currencies were being passed");
 
+    let etfs = matches.value_of("etfs").expect("No ETF symbol passed");
+
     debug!("Querying the following currencies: {:?}", currency_list);
 
     let cmc_pro_api_key = dotenv::var("CMC_PRO_API_KEY").expect("CMC key not set");
+    let eod_token = dotenv::var("EOD_TOKEN").expect("EOD token not set");
 
     if cmc_pro_api_key.is_empty() {
         error!("Empty CMC API KEY provided! Please set one via the .env file!");
@@ -135,6 +149,18 @@ async fn main() -> Result<(), OneError> {
         .await?;
 
     let currencies = resp.json::<CMCResponse>().await?;
+
+    let etf = client
+        .get(format!(
+            "https://eodhistoricaldata.com/api/real-time/{}?api_token={}&fmt=json",
+            etfs, eod_token
+        ))
+        .send()
+        .await?;
+
+    let amundi_etf = etf.json::<EODResponse>().await?;
+
+    debug!("Fetched ETF: {}", amundi_etf.close);
 
     let mut wtr = Writer::from_path("prices.csv")?;
     wtr.write_record(&["Name", "Symbol", "Price", "7DayChange"])?;
